@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Autodesk.Revit.ApplicationServices;
 
 namespace CreationModelPlugin
 {
@@ -65,7 +66,9 @@ namespace CreationModelPlugin
             }
           
             AddDoor(doc, level1, walls[0]);
-            
+           
+           
+
 
             transaction.Commit();
 
@@ -76,11 +79,88 @@ namespace CreationModelPlugin
             AddWindow(doc, level1, walls[3]);
 
             transaction.Commit();
+ 
+            transaction.Start();
 
+           AddRoof(doc, listLevel, walls);
+
+            transaction.Commit();
 
             return;
         }
-    
+
+        public void AddRoof(Document doc, List<Level> listLevel, List<Wall> walls)
+        {
+            // RoofType roofType = new FilteredElementCollector(doc)
+            //     .OfClass(typeof(RoofType))
+            //     .OfType<RoofType>()
+            //     .Where(x => x.Name.Equals("Типовой - 125мм"))
+            //     .Where(x => x.FamilyName.Equals("Базовая крыша"))
+            //     .FirstOrDefault();
+
+            // View view = new FilteredElementCollector(doc)
+            //.OfClass(typeof(View))
+            //     .OfType<View>()
+            //     .Where(x => x.Name.Equals("Уровень 1"))
+            //     .FirstOrDefault();
+
+            // double wallWight = walls[0].Width;
+            // double dt = wallWight / 2;
+
+            // double extrusionStart = -width / 2 - dt;
+            // double extrusionEnd = width / 2 + dt;
+
+            // double curveStart = -depth / 2 - dt;
+            // double curveEnd = depth / 2 + dt;
+
+            // CurveArray curveArray = new CurveArray();
+            // curveArray.Append(Line.CreateBound(new XYZ(0, curveStart, level2.Elevation), new XYZ(0, 0, level2.Elevation + 10)));
+            // curveArray.Append(Line.CreateBound(new XYZ(0, 0, level2.Elevation + 10),new XYZ(0, curveStart, level2.Elevation) ));
+
+            // ReferencePlane plane = doc.Create.NewReferencePlane(new XYZ(0, 0, 0), new XYZ(0, 0, 20), new XYZ(0, 20, 0), view);
+            // ExtrusionRoof extrusionRoof = doc.Create.NewExtrusionRoof(curveArray, plane, level2, roofType, extrusionStart, extrusionEnd);
+            // extrusionRoof.EaveCuts = EaveCutterType.TwoCutSquare;
+
+            var level = listLevel
+                  .Where(x => x.Name.Equals("Уровень 2"))
+                  .FirstOrDefault();
+
+            RoofType roofType = new FilteredElementCollector(doc)
+                .OfClass(typeof(RoofType))
+                .OfType<RoofType>()
+                .Where(x => x.Name.Equals("Типовой - 400мм"))
+                .Where(x => x.FamilyName.Equals("Базовая крыша"))
+                .FirstOrDefault();
+
+            double wallWidth = walls[0].Width;
+            double df = wallWidth / 2;
+            double dh = level.get_Parameter(BuiltInParameter.LEVEL_ELEV).AsDouble();
+            XYZ dt = new XYZ(-df, -df, dh);
+            XYZ dz = new XYZ(0, 0, 20);
+            XYZ dy = new XYZ(0, 20, 0);
+            LocationCurve locationCurve = walls[0].Location as LocationCurve;
+            XYZ point = locationCurve.Curve.GetEndPoint(0);
+            double l = (walls[0].Location as LocationCurve).Curve.Length + df * 2;
+            double w = ((walls[1].Location as LocationCurve).Curve.Length / 2) + df;
+            XYZ origin = point + dt;
+            XYZ vy = XYZ.BasisY;
+            XYZ vz = XYZ.BasisZ;
+
+            CurveArray curve = new CurveArray();
+            curve.Append(Line.CreateBound(origin, origin + new XYZ(0, w, 5)));
+            curve.Append(Line.CreateBound(origin + new XYZ(0, w, 5), origin + new XYZ(0, w * 2, 0)));
+
+
+            var av = doc.ActiveView;
+            Transaction transaction = new Transaction(doc, "Создание крыши");
+            transaction.Start();
+
+            ReferencePlane plane = doc.Create.NewReferencePlane2(origin, origin + vz, origin + vy, av);
+
+            ExtrusionRoof extrusionRoof = doc.Create.NewExtrusionRoof(curve, plane, level, roofType, 0, 3);
+
+            transaction.Commit();
+        }
 
         private void AddWindow(Document doc, Level level1, Wall wall)
         {
